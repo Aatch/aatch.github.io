@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Adventures in the Absurd]]></title>
-  <link href="http://aatch.github.io/atom.xml" rel="self"/>
+  <title><![CDATA[Category: debt | Adventures in the Absurd]]></title>
+  <link href="http://aatch.github.io/blog/categories/debt/atom.xml" rel="self"/>
   <link href="http://aatch.github.io/"/>
   <updated>2013-06-19T18:11:27+12:00</updated>
   <id>http://aatch.github.io/</id>
@@ -83,18 +83,23 @@ A simple wrong turn can lead you down a path that might not <em>ever</em> be use
 
 <p>A common pattern in old Rust code is to do something like this:</p>
 
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="n">struct</span> <span class="n">Foo_</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">num</span><span class="o">:</span> <span class="k">int</span>
-</span><span class='line'><span class="p">}</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="n">struct</span> <span class="n">Foo_</span> <span class="p">{</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
 </span><span class='line'>
-</span><span class='line'><span class="n">pub</span> <span class="k">type</span> <span class="n">Foo</span> <span class="o">=</span> <span class="o">@</span><span class="k">mut</span> <span class="n">Foo_</span><span class="p">;</span>
-</span></code></pre></td></tr></table></div></figure>
-
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="n">num</span><span class="o">:</span> <span class="k">int</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="p">}</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="n">pub</span> <span class="k">type</span> <span class="n">Foo</span> <span class="o">=</span> <span class="o">@</span><span class="k">mut</span> <span class="n">Foo_</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
 
 <p>This code predates the powerful region system we have now, and (presumably) served to make life
 easier, since you would otherwise need to pass around a <code>@mut Foo</code> explicitly. Times have changed
@@ -102,14 +107,19 @@ though, and this pattern only makes it harder to fix things. Patrick Walton rece
 that 7% of the time spent during compilation is on ref-count bumping. This is because a function
 like this:</p>
 
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">fn</span> <span class="n">bar</span><span class="p">(</span><span class="n">a</span><span class="o">:</span> <span class="n">Foo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="k">int</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">a</span><span class="p">.</span><span class="n">num</span>
-</span><span class='line'><span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">fn</span> <span class="n">bar</span><span class="p">(</span><span class="n">a</span><span class="o">:</span> <span class="n">Foo</span><span class="p">)</span> <span class="o">&amp;</span><span class="n">ndash</span><span class="p">;</span><span class="o">&gt;</span> <span class="k">int</span> <span class="p">{</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="n">a</span><span class="p">.</span><span class="n">num</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
 
 <p>does a ref-count increase for <code>Foo</code> when entering the function, then later drops that count when
 the function ends. In the simple example above, that might be optimized out, but more often than

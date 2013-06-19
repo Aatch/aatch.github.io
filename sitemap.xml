@@ -1,15 +1,19 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
     <url>
-        <loc>http://Aatch.github.io/</loc>
+        <loc>http://aatch.github.io/blog/2013/06/19/paying-technical-debt-in-rustc/</loc>
+        <lastmod>2013-06-19T18:10:28+12:00</lastmod>
+    </url>
+    <url>
+        <loc>http://aatch.github.io/</loc>
+        <lastmod>2013-06-19T18:10:28+12:00</lastmod>
+    </url>
+    <url>
+        <loc>http://aatch.github.io/robots.txt</loc>
         <lastmod>2013-06-19T12:54:22+12:00</lastmod>
     </url>
     <url>
-        <loc>http://Aatch.github.io/robots.txt</loc>
-        <lastmod>2013-06-19T12:54:22+12:00</lastmod>
-    </url>
-    <url>
-        <loc>http://Aatch.github.io/blog/archives/</loc>
-        <lastmod>2013-06-19T12:54:22+12:00</lastmod>
+        <loc>http://aatch.github.io/blog/archives/</loc>
+        <lastmod>2013-06-19T18:10:28+12:00</lastmod>
     </url>
 </urlset>
