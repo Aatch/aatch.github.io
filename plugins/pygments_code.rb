@@ -5,6 +5,12 @@ require 'digest/md5'
 PYGMENTS_CACHE_DIR = File.expand_path('../../.pygments-cache', __FILE__)
 FileUtils.mkdir_p(PYGMENTS_CACHE_DIR)
 
+module Pygments
+    module Popen
+        @python_binary = "python2"
+    end
+end
+
 module HighlightCode
   def highlight(str, lang)
     lang = 'ruby' if lang == 'ru'
@@ -23,8 +29,8 @@ module HighlightCode
       else
         begin
           highlighted_code = Pygments.highlight(code, :lexer => lang, :formatter => 'html', :options => {:encoding => 'utf-8'})
-        rescue MentosError
-          raise "Pygments can't parse unknown language: #{lang}."
+        rescue MentosError => e
+          raise "Pygments can't parse unknown language: #{lang}. [#{e.backtrace.inspect}]"
         end
         File.open(path, 'w') {|f| f.print(highlighted_code) }
       end
