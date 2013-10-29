@@ -81,6 +81,9 @@ article {
     }
   }
 
+  p {
+    text-align: justify;
+  }
 }
 article + article {
   .blog-index & {
