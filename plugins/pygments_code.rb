@@ -12,7 +12,7 @@ module Pygments
 end
 
 module HighlightCode
-  def highlight(str, lang)
+  def self.highlight(str, lang)
     lang = 'ruby' if lang == 'ru'
     lang = 'objc' if lang == 'm'
     lang = 'perl' if lang == 'pl'
@@ -21,7 +21,7 @@ module HighlightCode
     tableize_code(str, lang)
   end
 
-  def pygments(code, lang)
+  def self.pygments(code, lang)
     if defined?(PYGMENTS_CACHE_DIR)
       path = File.join(PYGMENTS_CACHE_DIR, "#{lang}-#{Digest::MD5.hexdigest(code)}.html")
       if File.exist?(path)
@@ -35,11 +35,11 @@ module HighlightCode
         File.open(path, 'w') {|f| f.print(highlighted_code) }
       end
     else
-      highlighted_code = Pygments.highlight(code, :lexer => lang, :formatter => 'html', :options => {:encoding => 'utf-8'})
+      highlighted_code = Pygments.highlight(code, :lexer => lang, :formatter => 'html', :options => {:encoding => 'utf-8', :startinline => true})
     end
     highlighted_code
   end
-  def tableize_code (str, lang = '')
+  def self.tableize_code (str, lang = '')
     table = '<div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers">'
     code = ''
     str.lines.each_with_index do |line,index|
