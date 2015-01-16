@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Adventures in the Absurd]]></title>
+  <link href="http://aatch.github.io/atom.xml" rel="self"/>
+  <link href="http://aatch.github.io/"/>
+  <updated>2015-01-17T12:26:06+13:00</updated>
+  <id>http://aatch.github.io/</id>
+  <author>
+    <name><![CDATA[James Miller]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Unboxed Closures and FFI Callbacks]]></title>
+    <link href="http://aatch.github.io/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/"/>
+    <updated>2015-01-17T11:24:36+13:00</updated>
+    <id>http://aatch.github.io/blog/2015/01/17/unboxed-closures-and-ffi-callbacks</id>
+    <content type="html"><![CDATA[<p>Rust is awesome, but sometimes you need to step out of the comforting embrace of a powerful type
+system and watchful compiler and interact with other languages. Fortunately Rust handles this
+quite well, with a robust and easy-to-use foreign function interface that requires little more
+than writing out the signatures of the foreign functions.</p>
+
+<p>However that is only half the battle when writing bindings. The next part is figuring out the best
+way to present the (normally) C API to Rust users. Exploiting the type system and features of the
+language as best you can. Sometimes this is easy, sometimes hard, but one thing that is always
+tricky to manage are callbacks.</p>
+
+<p>Rust has closures as first-class entities, so it&rsquo;s natural that a bindings author would want to use
+them when exposing a callback API to users. But how do you map Rust&rsquo;s closures to C&rsquo;s idea of
+functions? Well, that&rsquo;s what I&rsquo;m going to show you.</p>
+
+<!--more-->
+
+
+<p>For the purposes of this demonstration, I&rsquo;m going to assume that you have a C function that looks
+a little like this:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">void</span> <span class="nf">do_thing</span><span class="p">(</span><span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">cb</span><span class="p">)(</span><span class="kt">void</span><span class="o">*</span><span class="p">,</span> <span class="kt">int</span><span class="p">,</span> <span class="kt">int</span><span class="p">),</span> <span class="kt">void</span><span class="o">*</span> <span class="n">user_data</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Note that the presence of that <code>void*</code> in both the callback signature and the function itself. This
+is fairly common, the pointer is passed to the callback untouched. It&rsquo;s also required for this
+technique to work. I&rsquo;ll show everything, end explain it afterwards.</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">pub</span> <span class="kn">mod</span> <span class="n">ffi</span> <span class="p">{</span>
+</span><span class='line'>  <span class="k">extern</span> <span class="s">&quot;C&quot;</span> <span class="p">{</span>
+</span><span class='line'>    <span class="c1">// Declare the prototype for the external function</span>
+</span><span class='line'>    <span class="k">pub</span> <span class="k">fn</span> <span class="n">do_thing</span><span class="p">(</span><span class="n">cb</span><span class="o">:</span> <span class="k">extern</span> <span class="k">fn</span> <span class="p">(</span><span class="o">*</span><span class="k">mut</span> <span class="n">c_void</span><span class="p">,</span> <span class="n">c_int</span><span class="p">,</span> <span class="n">c_int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">c_int</span><span class="p">,</span>
+</span><span class='line'>              <span class="n">user_data</span><span class="o">:</span> <span class="o">*</span><span class="k">mut</span> <span class="n">c_void</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Exposed function to the user of the bindings</span>
+</span><span class='line'><span class="k">pub</span> <span class="k">fn</span> <span class="n">do_thing</span><span class="o">&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">(</span><span class="n">f</span><span class="o">:</span> <span class="n">F</span><span class="p">)</span> <span class="n">where</span> <span class="n">F</span><span class="o">:</span> <span class="n">Fn</span><span class="p">(</span><span class="kt">i32</span><span class="p">,</span> <span class="kt">i32</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">i32</span> <span class="p">{</span>
+</span><span class='line'>  <span class="kd">let</span> <span class="n">user_data</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">f</span> <span class="k">as</span> <span class="o">*</span><span class="kr">const</span> <span class="n">_</span> <span class="k">as</span> <span class="o">*</span><span class="k">mut</span> <span class="n">c_void</span><span class="p">;</span>
+</span><span class='line'>  <span class="k">unsafe</span> <span class="p">{</span>
+</span><span class='line'>  <span class="n">ffi</span><span class="o">::</span><span class="n">do_thing</span><span class="p">(</span><span class="n">do_thing_wrapper</span><span class="o">::&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">user_data</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// Shim interface function</span>
+</span><span class='line'>  <span class="k">extern</span> <span class="k">fn</span> <span class="n">do_thing_wrapper</span><span class="o">&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">(</span><span class="n">closure</span><span class="o">:</span> <span class="o">*</span><span class="k">mut</span> <span class="n">c_void</span><span class="p">,</span> <span class="n">a</span><span class="o">:</span> <span class="n">c_int</span><span class="p">,</span> <span class="n">b</span><span class="o">:</span> <span class="n">c_int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">c_int</span>
+</span><span class='line'>      <span class="n">where</span> <span class="n">F</span><span class="o">:</span> <span class="n">Fn</span><span class="p">(</span><span class="kt">i32</span><span class="p">,</span> <span class="kt">i32</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">i32</span> <span class="p">{</span>
+</span><span class='line'>  <span class="kd">let</span> <span class="n">opt_closure</span> <span class="o">=</span> <span class="n">closure</span> <span class="k">as</span> <span class="o">*</span><span class="k">mut</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">;</span>
+</span><span class='line'>  <span class="k">unsafe</span> <span class="p">{</span>
+</span><span class='line'>    <span class="kd">let</span> <span class="n">res</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">opt_closure</span><span class="p">).</span><span class="n">take</span><span class="p">().</span><span class="n">unwrap</span><span class="p">()(</span><span class="n">a</span> <span class="k">as</span> <span class="kt">i32</span><span class="p">,</span> <span class="n">b</span> <span class="k">as</span> <span class="kt">i32</span><span class="p">);</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">res</span> <span class="k">as</span> <span class="n">c_int</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>So, first we declare the prototype so we can call it from Rust code, fairly standard stuff here.
+Next, we make the actual exposed function and take a closure of the appropriate type. I&rsquo;ve opted
+for the <code>Fn</code> unboxed closure kind, but you could take a <code>FnMut</code> or even a <code>FnOnce</code> if you know the
+callback will only be called once.</p>
+
+<p>Now, inside this function is the tricky part. <code>&amp;f as *const _ as *mut c_void</code> takes a reference
+to the closure, casts it to a raw pointer (the <code>_</code> means that you want the compiler to infer that
+part of the type) and then casts again to get the <code>*mut c_void</code> we need to pass along as the user
+data. The actual call to the FFI function contains this oddity: <code>do_thing_wrapper::&lt;F&gt;</code> this uses
+the ability to explicitly provide the type parameters to functions to, well, explicitly provide the
+correct type. This is needed because otherwise Rust can&rsquo;t figure out the correct type to fill in.</p>
+
+<p>The <code>do_thing_wrapper</code> is a foreign-ABI Rust function. This means that it&rsquo;s a function, written in
+Rust, that uses a non-Rust ABI. In this case, because we didn&rsquo;t provide one explicitly, it falls
+defaults to &ldquo;C&rdquo;. Other than the type parameter, it matches the signature of the callback for the
+<code>ffi::do_thing</code> function.</p>
+
+<p>Inside the wrapper, we cast the closure to a <code>*mut Option&lt;F&gt;</code>, then do
+<code>(*opt_closure).take().unwrap()</code> on it, this returns the actual unboxed closure we started with.
+Then we call the closure, converting the arguments to the correct type and return the result,
+again converting to the appropriate type.</p>
+
+<p>And that&rsquo;s it! Note that this will only work if you know that the closure will be called before the
+end of <code>do_thing</code>. We take a pointer to the entire closure, which exists on the stack, so that
+pointer will become invalid when <code>do_thing</code> returns.</p>
+
+<h2>How it works</h2>
+
+<p>The way this works is actually remarkably simple. The key part is the <code>do_thing_wrapper::&lt;F&gt;</code>
+expression. Rust uses a technique called &ldquo;monomorphisation&rdquo; to handle generic types, including
+generic functions. Monomorphisation basically consists of subtituting the type parameters with
+concrete types and compiling the resulting non-generic function. What happens when <code>do_thing</code> is
+monomorphised is that <code>do_thing_wrapper::&lt;F&gt;</code> is also monomorphised, creating a unique function
+that is of the correct type to pass to the callback. Since we used a type parameter in
+<code>do_thing_wrapper</code>, we can cast from the passed opaque pointer to the actual closure and continue
+as normal.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[A Rustic Linker Model]]></title>
+    <link href="http://aatch.github.io/blog/2013/10/29/a-rustic-linker-model/"/>
+    <updated>2013-10-29T13:15:00+13:00</updated>
+    <id>http://aatch.github.io/blog/2013/10/29/a-rustic-linker-model</id>
+    <content type="html"><![CDATA[<p>This is a kinda-sorta proposal for a linking model for the rust compiler to use, allowing us to
+separate out from system-specific semantics and avoid being tied too closely to a system linker.
+The goals are to maintain most compatibility with system tools (linkers in particular), allow
+common cases to behave identically on all supported platforms and maintain an escape hatch to allow
+complex and/or esoteric cases to still work without too much hackery or relying on undocumented
+behaviour.</p>
+
+<!-- More -->
+
+
+<h2>What is linking?</h2>
+
+<p>If you are already familiar with the concept of linking, feel free to skip this section, otherwise
+here is a quick rundown of what linking is.</p>
+
+<p>If you come from a primarily dynamic-language background (Python, Ruby, etc) then the concept of
+linking is likely unfamiliar to you. However, it is an important step in the process of turning
+your code into a library that can be shared or an executable that actually does something. Briefly,
+linking is the process of taking compiled code and &ldquo;linking&rdquo; it with other compiled code to allow
+that code to call out to other libraries.</p>
+
+<p>When you compile a Rust library, one step produces a temporary file called an <em>Object File</em>. This
+is a file in a specific format depending on what platform you&rsquo;re on. On Linux, this file is in the
+ELF format. Now, this file only contains your code, so if you called any functions or methods from
+other places you have references to those in your code, they are called <em>Unresolved Symbols</em> and
+until they are resolved your code won&rsquo;t work.</p>
+
+<p>The process of linking mostly involves finding out where those unresolved symbols live and, well,
+resolving them. The linker will look in the libraries it has been told to for those symbols and
+makes a note of where it found the symbol. While the exact behaviour depends on what type of file
+you want to make, the process of making that file is effectively the same for both executables and
+libraries.</p>
+
+<p>If an unresolved symbol is found in a static library, then the code associated with that library is
+copied into the new file and the symbol is resolved to point there. If the symbol is found in
+a dynamic library, then the name of that file is added to a special list in the new file. When the
+file is loaded (either in order to run it, or because another file needs it), this list is used to
+load any required files and dynamically resolve any symbols needed.</p>
+
+<h2>Platform Compatibility</h2>
+
+<p>This, to me, is probably the most important point. While there is a difference between being
+compatible and being user-friendly, being incompatible with platform tools could severely limit the
+situations that Rust would otherwise work in. This means using platform-specific formats and making
+sure that any Rust-specific functionality can be implemented across the majority of platforms.</p>
+
+<p>Fortunately, this goal is actually easier to achieve than not acheive as we would otherwise have to
+replicate a lot of functionality that already exists in system tools. Ultimately, we&rsquo;re better off
+using the work already done than trying to create our own system that does the same thing.</p>
+
+<p>The only exception to this goal is supporting LTO (Link Time Optimisation). However, it seems that
+all other implementations of LTO share the same limitation, so it does not seem unreasonable to
+share this limitation for Rust.</p>
+
+<h2>Common Cases</h2>
+
+<p>The phrase &ldquo;Common Case&rdquo; has a lot of baggage, as everybody has a different idea of what a &ldquo;common&rdquo;
+case is. However, for the purposes of this discussion, I shall define &ldquo;common&rdquo; to be compiling
+either a host platform executable or a host platform library. This should be broad enough to cover
+most cases without too much controversy.</p>
+
+<p>With that in mind, there are 4 types of files I have identified as common-case outputs</p>
+
+<ul>
+<li>Executable</li>
+<li>Dynamic Library</li>
+<li>Static Library</li>
+<li>LTO Library</li>
+</ul>
+
+
+<p>In order to make linking behaviour the same across platforms, we need to specify what behaviour we
+want in order to see what we might need to augment on what platforms to allow for the behaviour we
+want. The behaviour, apart from standard linking behaviour, is as follows:</p>
+
+<ul>
+<li>Linking to a library does not add any extra explicit dependencies to the initial project. This is
+the same for both dynamic and static libraries.</li>
+<li>The default priority for linking libraries is LTO libraries then static libraries followed
+finally by dynamic libraries. This can be controlled on an overall-level and a per-library level.
+It should be possible to force a dynamic link even if a LTO library is available and it should be
+possible to prioritise a dynamic library over a static one.</li>
+<li>The path searched for libraries should start with command-line passed search paths, followed by
+a rust-specific linker path environment variable (e.g. <code>RUST_LIBRARY_PATH</code>), finally followed by
+the system linker path.</li>
+<li>The default behaviour for linking to a static library should <em>not</em> cause the static library to
+become a dependency. This could be overridden in cases where you know that the dependencies will
+always be available. (For example, the core libraries)</li>
+<li>The same rules should apply when linking in a non-rust library.</li>
+</ul>
+
+
+<p>Again, this should cover most common cases and is already similar to the existing model. The first
+two points are related. The way libraries are chosen is based on the first match found by searching
+the paths, meaning that a dynamic library that is on a path earlier than a static library will be
+linked instead of the static library.</p>
+
+<p>This behaviour is intended to be separate from any platform-specific behaviour, the intention being
+to provide a consistent base that users can rely on. Ideally we should be able to &ldquo;fill in the
+gaps&rdquo; where platform behaviour deviates from the described behaviour.</p>
+
+<h2>Uncommon cases and People doing weird things</h2>
+
+<p>These are cases that should be kept in mind, even though they might be more off of the radar than
+most people will encounter.</p>
+
+<ul>
+<li>Cross-Compilation. Not particular out-there, but uncommon nonetheless. Ultimately, this should
+just require an extra flag to the compiler to compile to a different target. There may be
+interaction with linking to incompatible libraries though, so that needs to be kept in mind.</li>
+<li>Non-standard linking process. This is doing stuff like using your own linker scripts to get finer
+control over the linker. The most obvious example here I can think of are kernels, where custom
+linker scripts are required to put symbols at known addresses.</li>
+<li>Linking from a non-Rust environment. This is linking to a library from another natively-compiled
+language, like C. While there are things to be aware of outside of just linking, we should try to
+avoid making the process too difficult.</li>
+<li>Linking in non-Rust object files. This is important for doing things like integrating assembly
+files into the object.</li>
+</ul>
+
+
+<p>To some extent, merely providing tools to inspect rust crates and maintaining the existing
+object-only output should help with most of these. Though handling many of them in the compiler
+would be nice.</p>
+
+<h2>Conclusion</h2>
+
+<p>Supporting the uncommon cases is what I am most interested in here. Currently, Rust can be quite
+difficult to use outside of the standard environment. I am aware though that the uncommon cases are
+uncommon for a reason, and therefore have prioritised what <em>I</em> think the common cases are. I am
+also undecided on the priority for the different library types, what is important is that
+a priority exists, not what the priority actually is.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Paying technical debt in rustc]]></title>
+    <link href="http://aatch.github.io/blog/2013/06/19/paying-technical-debt-in-rustc/"/>
+    <updated>2013-06-19T14:00:00+12:00</updated>
+    <id>http://aatch.github.io/blog/2013/06/19/paying-technical-debt-in-rustc</id>
+    <content type="html"><![CDATA[<p>With the 0.7 release of Rust almost upon us, it seems like a good time talk about some of the
+technical debt that has accrued in the compiler, the issues in the codegen module and plan of
+action to try and start paying off some of that debt.</p>
+
+<!-- more -->
+
+
+<p>The rust compiler has two kinds of technical debt. The first is the normal kind of technical debt
+where you say &ldquo;screw it, I&rsquo;ll do it properly later&rdquo;. This debt is common everywhere and generally
+comes from a need to get it working quickly, or fixing a problem that is blocking the solution you
+are actually working on. There isn&rsquo;t actually too much of this kind of debt in the rust code base.</p>
+
+<p>The other kind of debt you find in the compiler is rather more unique. The Rust compiler is,
+itself, written in Rust. This opens up whole new type of technical debt: not doing it properly
+because it wasn&rsquo;t possible at the time. Whether this means having to work around a bug in order to
+fix that bug, or having old patterns obsoleted by new features, this type of debt is much more
+insidious. At the time of writing, the author of such code isn&rsquo;t aware of the debt he is creating.
+He can&rsquo;t be. This means you end up with a proliferation of bad patterns and inconsistent code as
+the langauge evolves and the codebase struggles to keep up.</p>
+
+<h2>The debt in <code>trans</code></h2>
+
+<p>For the uninitated, the codegen module in <code>librustc</code> lives in <code>middle::trans</code>, which I will refer
+to as <code>trans</code> from here on in.</p>
+
+<p><code>trans</code> is where the compiler stops being a very specific static analyzer and starts being an
+actual compiler. Turning abstract representation into LLVM IR. This means that it is one of the
+most critical parts of the compiler from a performance standpoint. Some of the major issues with
+Rust are related to the output from this stage. One major issue is that our final IR is
+significantly larger than it should be. However, I&rsquo;m not here to talk about what is wrong with the
+functionality in <code>trans</code>.</p>
+
+<p>Instead, I&rsquo;m going to talk about how the accrued technical debt in <code>trans</code> stops, or at least
+hinders, fixing those issues.</p>
+
+<h3>Incomplete, bad and non-existant abstractions</h3>
+
+<p>An incredible number of functions in <code>trans</code> take a <code>TypeRef</code> or <code>ValueRef</code> directly. These are
+LLVM objects and are completely opaque. Furthermore, we often end up needing information that
+neither of these objects are capable of encoding, but don&rsquo;t have easily available. Often the code
+uses suspicious work arounds or regenerates the required information. This is silly because we have
+the full information from the type checker available to us.</p>
+
+<p>Some abstractions do exist, like <code>Datum</code>, but the lack of full integration into the rest of the
+module means that their use is limited. Even <code>Datum</code> is incomplete however, omitting useful
+information that would allow us to make better decisions in code. This means the abstractions we do
+have are bogged down trying to make sure they work with the rest of the code. It could be called
+leaky, but this more like deliberately punching a hole in your roof so the birds can still get in.</p>
+
+<p>Some of the biggest offenders are where we have only partial abstraction. Take for example
+functions. We have a <code>fn_ctxt</code> object for &ldquo;abstracting&rdquo; functions, but you already need an LLVM
+<code>ValueRef</code> for the function itself before you can create one. This means that <em>creating</em>
+a function, first starts with <em>declaring</em> it with a completely unrelated function, then you can
+start building it&rsquo;s body. Oh, and by the way, declaring a function consists of calling one three
+functions: <code>register_fn</code>, <code>register_fn_full</code> or <code>register_fn_fuller</code>. If you find yourself writing
+a function with the word &ldquo;fuller&rdquo; at the end, I suggest you take a step back and think about the
+life choices that led you here.</p>
+
+<p>This often means that a simple operation will trace through dozens of functions in several files.
+A simple wrong turn can lead you down a path that might not <em>ever</em> be used any more, wasting time.</p>
+
+<h3>Bad patterns</h3>
+
+<p>A common pattern in old Rust code is to do something like this:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">struct</span> <span class="n">Foo_</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">num</span><span class="o">:</span> <span class="kt">int</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">pub</span> <span class="k">type</span> <span class="n">Foo</span> <span class="o">=</span> <span class="o">@</span><span class="k">mut</span> <span class="n">Foo_</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This code predates the powerful region system we have now, and (presumably) served to make life
+easier, since you would otherwise need to pass around a <code>@mut Foo</code> explicitly. Times have changed
+though, and this pattern only makes it harder to fix things. Patrick Walton recently informed me
+that 7% of the time spent during compilation is on ref-count bumping. This is because a function
+like this:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">fn</span> <span class="n">bar</span><span class="p">(</span><span class="n">a</span><span class="o">:</span> <span class="n">Foo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">int</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">a</span><span class="p">.</span><span class="n">num</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>does a ref-count increase for <code>Foo</code> when entering the function, then later drops that count when
+the function ends. In the simple example above, that might be optimized out, but more often than
+not there is no way for the optimizer to know that it can do that, so the useless ref-count bumps
+stay.</p>
+
+<p>Unfortunately, these patterns lead to more bad patterns, and then more bad patterns. A good example
+is a statistic that relies on scoped destruction to construct nested contexts that get popped off
+as the context ends. The current context is stored in a structure that gets passed around to most
+functions, and the object that does the &ldquo;popping&rdquo; on destruction maintains a reference to that
+context. This means that the object needs a mutable reference to that structure that lasts for the
+entire function. This conflicts with the borrowing rules that prevent you from having multiple,
+mutable borrows (or even a mutable and an immutable one at the same time). Thus the solution is
+that you still need the <code>@mut</code> everywhere, even though that feature is literally the only thing
+that needs it.</p>
+
+<p>Similarly, there are plenty of other cases that only work because they rely on the nature of <code>@</code> or
+<code>@mut</code> that could easily work another way with modern Rust.</p>
+
+<h3>Poor naming and documentation</h3>
+
+<p>Some things in <code>trans</code> are just badly named. Either they are misleading or opaque. This is because
+of the &ldquo;I know what they mean&rdquo; effect. Some are somewhat benign, with the proliferation of <code>T_*</code>
+functions being a little opaque, but are easy to figure out (LLVM TypeRef construction). Others are
+maddening, like the <code>get_landing_pad</code> function in <code>base</code> that actually constructs the landing pad.
+Other cases where there are dead arguments, or redundant arguments, or arguments are exist to
+service one very specific case that infect every call to that function (or produce the crazy
+<code>register_fn*</code> chain).</p>
+
+<p>The poor documentation is more to do with the poor abstractions and naming than an absence of
+comments. Often you&rsquo;ll need to trace the life of a particular piece of data, but be unable to find
+where it comes into being. This is because some poorly-named function constructs it as a side
+effect and it is later pulled out of some cryptic map by a line of code that <em>just knows</em> that
+it&rsquo;ll be there. Unfortunately, more often than not, the reason you are trying to trace this
+particular object is because some other line of code that <em>just knows</em> about the existence of that
+object, is wrong.</p>
+
+<h3>Death by a thousand paper cuts</h3>
+
+<p>There are too many minor issues with the code to list them all. Individually they aren&rsquo;t
+a significant problem, but they conspire to make it just a little <em>too</em> difficult to fix something.
+Especially when that&rsquo;s not why you were there. Many of these issues could be fixed at the same time
+as others, but the hassle it causes makes contributors (who often are volunteers working for
+<em>free</em>) avoid it because they are trying to fix something else.</p>
+
+<h2>How to fix it</h2>
+
+<p>This is the sticking point, high-level ideas are nice, but I&rsquo;m not well-versed enough the code to
+know exactly what we need in terms of new abstractions and refactorings. It&rsquo;s obvious that we need
+to unify the function handling code, but what a function abstraction needs to look like is beyond
+me.</p>
+
+<p>I do know that something needs to be done, and I&rsquo;ve tried, but I&rsquo;ve hit the limit of my
+understanding of the existing code and basic refactorings aren&rsquo;t going to help much anymore. In an
+ideal world, we would just throw out <code>trans</code> and start again. Maybe salvaging what&rsquo;s there in order
+to save time. Unfortunately, this is the real world and we can&rsquo;t stop all work on the compiler
+while a module is being re-written. So the existing code needs to be moved, re-written, refactored
+and improved, piece by piece until we get something that we don&rsquo;t have to ward newbies away from in
+case they pick up bad habits.</p>
+]]></content>
+  </entry>
+  
+</feed>
