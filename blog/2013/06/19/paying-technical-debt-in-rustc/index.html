@@ -76,7 +76,7 @@ technical debt that has accrued in the compiler, the &hellip;">
   
 
 
-<time datetime="2013-06-19T14:00:00+12:00" pubdate data-updated="true">Jun 19<span>th</span>, 2013</time>
+<time datetime="2013-06-19T14:00:00+12:00" pubdate data-updated="true"></time>
       </p>
     
   </header>
@@ -147,16 +147,16 @@ A simple wrong turn can lead you down a path that might not <em>ever</em> be use
 
 <p>A common pattern in old Rust code is to do something like this:</p>
 
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="n">struct</span> <span class="n">Foo_</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">num</span><span class="o">:</span> <span class="k">int</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">struct</span> <span class="n">Foo_</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">num</span><span class="o">:</span> <span class="kt">int</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
-</span><span class='line'><span class="n">pub</span> <span class="k">type</span> <span class="n">Foo</span> <span class="o">=</span> <span class="o">@</span><span class="k">mut</span> <span class="n">Foo_</span><span class="p">;</span>
+</span><span class='line'><span class="k">pub</span> <span class="k">type</span> <span class="n">Foo</span> <span class="o">=</span> <span class="o">@</span><span class="k">mut</span> <span class="n">Foo_</span><span class="p">;</span>
 </span></code></pre></td></tr></table></div></figure>
 
 
@@ -166,10 +166,10 @@ though, and this pattern only makes it harder to fix things. Patrick Walton rece
 that 7% of the time spent during compilation is on ref-count bumping. This is because a function
 like this:</p>
 
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">fn</span> <span class="n">bar</span><span class="p">(</span><span class="n">a</span><span class="o">:</span> <span class="n">Foo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="k">int</span> <span class="p">{</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">fn</span> <span class="n">bar</span><span class="p">(</span><span class="n">a</span><span class="o">:</span> <span class="n">Foo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">int</span> <span class="p">{</span>
 </span><span class='line'>    <span class="n">a</span><span class="p">.</span><span class="n">num</span>
 </span><span class='line'><span class="p">}</span>
 </span></code></pre></td></tr></table></div></figure>
@@ -255,7 +255,7 @@ case they pick up bad habits.</p>
   
 
 
-<time datetime="2013-06-19T14:00:00+12:00" pubdate data-updated="true">Jun 19<span>th</span>, 2013</time>
+<time datetime="2013-06-19T14:00:00+12:00" pubdate data-updated="true"></time>
       
 
 <span class="categories">
@@ -268,8 +268,6 @@ case they pick up bad habits.</p>
     </p>
     
       <div class="sharing">
-  
-  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://aatch.github.io/blog/2013/06/19/paying-technical-debt-in-rustc/" data-via="MrAatch" data-counturl="http://aatch.github.io/blog/2013/06/19/paying-technical-debt-in-rustc/" >Tweet</a>
   
   
   
@@ -294,6 +292,10 @@ case they pick up bad habits.</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/">Unboxed Closures and FFI Callbacks</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2013/10/29/a-rustic-linker-model/">A Rustic Linker Model</a>
       </li>
     
@@ -307,7 +309,7 @@ case they pick up bad habits.</p>
 <section>
   <h1>GitHub Repos</h1>
   <ul id="gh_repos">
-    <li class="loading">Status updating...</li>
+    <li class="loading">Status updating&#8230;</li>
   </ul>
   
   <a href="https://github.com/Aatch">@Aatch</a> on GitHub
@@ -341,7 +343,7 @@ case they pick up bad habits.</p>
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2013 - James Miller
+  Copyright &copy; 2015 - James Miller
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 
@@ -353,16 +355,6 @@ case they pick up bad habits.</p>
 
 
 
-
-  <script type="text/javascript">
-    (function(){
-      var twitterWidgets = document.createElement('script');
-      twitterWidgets.type = 'text/javascript';
-      twitterWidgets.async = true;
-      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
-      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
-    })();
-  </script>
 
 
 

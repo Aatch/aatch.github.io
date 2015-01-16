@@ -9,8 +9,8 @@
   <meta name="author" content="James Miller">
 
   
-  <meta name="description" content="This is a kinda-sorta proposal for a linking model for the rust compiler to use, allowing us to
-separate out from system-specific semantics and avoid &hellip;">
+  <meta name="description" content="Rust is awesome, but sometimes you need to step out of the comforting embrace of a powerful type
+system and watchful compiler and interact with other &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -63,6 +63,58 @@ separate out from system-specific semantics and avoid &hellip;">
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/">Unboxed Closures and FFI Callbacks</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-01-17T11:24:36+13:00" pubdate data-updated="true"></time>
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Rust is awesome, but sometimes you need to step out of the comforting embrace of a powerful type
+system and watchful compiler and interact with other languages. Fortunately Rust handles this
+quite well, with a robust and easy-to-use foreign function interface that requires little more
+than writing out the signatures of the foreign functions.</p>
+
+<p>However that is only half the battle when writing bindings. The next part is figuring out the best
+way to present the (normally) C API to Rust users. Exploiting the type system and features of the
+language as best you can. Sometimes this is easy, sometimes hard, but one thing that is always
+tricky to manage are callbacks.</p>
+
+<p>Rust has closures as first-class entities, so it&rsquo;s natural that a bindings author would want to use
+them when exposing a callback API to users. But how do you map Rust&rsquo;s closures to C&rsquo;s idea of
+functions? Well, that&rsquo;s what I&rsquo;m going to show you.</p>
+
+</div>
+  
+  
+    <footer>
+      <a rel="full-article" href="/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/">Read on &rarr;</a>
+    </footer>
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2013/10/29/a-rustic-linker-model/">A Rustic Linker Model</a></h1>
     
     
@@ -79,7 +131,7 @@ separate out from system-specific semantics and avoid &hellip;">
   
 
 
-<time datetime="2013-10-29T13:15:00+13:00" pubdate data-updated="true">Oct 29<span>th</span>, 2013</time>
+<time datetime="2013-10-29T13:15:00+13:00" pubdate data-updated="true"></time>
       </p>
     
   </header>
@@ -96,7 +148,7 @@ behaviour.</p>
   
   
     <footer>
-      <a rel="full-article" href="/blog/2013/10/29/a-rustic-linker-model/">More &rarr;</a>
+      <a rel="full-article" href="/blog/2013/10/29/a-rustic-linker-model/">Read on &rarr;</a>
     </footer>
   
 
@@ -124,7 +176,7 @@ behaviour.</p>
   
 
 
-<time datetime="2013-06-19T14:00:00+12:00" pubdate data-updated="true">Jun 19<span>th</span>, 2013</time>
+<time datetime="2013-06-19T14:00:00+12:00" pubdate data-updated="true"></time>
       </p>
     
   </header>
@@ -138,7 +190,7 @@ action to try and start paying off some of that debt.</p>
   
   
     <footer>
-      <a rel="full-article" href="/blog/2013/06/19/paying-technical-debt-in-rustc/">More &rarr;</a>
+      <a rel="full-article" href="/blog/2013/06/19/paying-technical-debt-in-rustc/">Read on &rarr;</a>
     </footer>
   
 
@@ -156,6 +208,10 @@ action to try and start paying off some of that debt.</p>
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/">Unboxed Closures and FFI Callbacks</a>
+      </li>
     
       <li class="post">
         <a href="/blog/2013/10/29/a-rustic-linker-model/">A Rustic Linker Model</a>
@@ -204,7 +260,7 @@ action to try and start paying off some of that debt.</p>
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2013 - James Miller
+  Copyright &copy; 2015 - James Miller
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 
@@ -216,16 +272,6 @@ action to try and start paying off some of that debt.</p>
 
 
 
-
-  <script type="text/javascript">
-    (function(){
-      var twitterWidgets = document.createElement('script');
-      twitterWidgets.type = 'text/javascript';
-      twitterWidgets.async = true;
-      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
-      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
-    })();
-  </script>
 
 
 

@@ -4,7 +4,7 @@
   <title><![CDATA[Category: rust | Adventures in the Absurd]]></title>
   <link href="http://aatch.github.io/blog/categories/rust/atom.xml" rel="self"/>
   <link href="http://aatch.github.io/"/>
-  <updated>2013-10-29T17:28:55+13:00</updated>
+  <updated>2015-01-17T12:26:06+13:00</updated>
   <id>http://aatch.github.io/</id>
   <author>
     <name><![CDATA[James Miller]]></name>
@@ -12,6 +12,104 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Unboxed Closures and FFI Callbacks]]></title>
+    <link href="http://aatch.github.io/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/"/>
+    <updated>2015-01-17T11:24:36+13:00</updated>
+    <id>http://aatch.github.io/blog/2015/01/17/unboxed-closures-and-ffi-callbacks</id>
+    <content type="html"><![CDATA[<p>Rust is awesome, but sometimes you need to step out of the comforting embrace of a powerful type
+system and watchful compiler and interact with other languages. Fortunately Rust handles this
+quite well, with a robust and easy-to-use foreign function interface that requires little more
+than writing out the signatures of the foreign functions.</p>
+
+<p>However that is only half the battle when writing bindings. The next part is figuring out the best
+way to present the (normally) C API to Rust users. Exploiting the type system and features of the
+language as best you can. Sometimes this is easy, sometimes hard, but one thing that is always
+tricky to manage are callbacks.</p>
+
+<p>Rust has closures as first-class entities, so it&rsquo;s natural that a bindings author would want to use
+them when exposing a callback API to users. But how do you map Rust&rsquo;s closures to C&rsquo;s idea of
+functions? Well, that&rsquo;s what I&rsquo;m going to show you.</p>
+
+<!--more-->
+
+
+<p>For the purposes of this demonstration, I&rsquo;m going to assume that you have a C function that looks
+a little like this:</p>
+
+<pre><code class="c">void do_thing(int (*cb)(void*, int, int), void* user_data);
+</code></pre>
+
+<p>Note that the presence of that <code>void*</code> in both the callback signature and the function itself. This
+is fairly common, the pointer is passed to the callback untouched. It&rsquo;s also required for this
+technique to work. I&rsquo;ll show everything, end explain it afterwards.</p>
+
+<pre><code class="rust">pub mod ffi {
+  extern "C" {
+    // Declare the prototype for the external function
+    pub fn do_thing(cb: extern fn (*mut c_void, c_int, c_int) -&gt; c_int,
+                user_data: *mut c_void);
+  }
+}
+
+// Exposed function to the user of the bindings
+pub fn do_thing&lt;F&gt;(f: F) where F: Fn(i32, i32) -&gt; i32 {
+  let user_data = &amp;f as *const _ as *mut c_void;
+  unsafe {
+    ffi::do_thing(do_thing_wrapper::&lt;F&gt;, user_data);
+  }
+
+  // Shim interface function
+  extern fn do_thing_wrapper&lt;F&gt;(closure: *mut c_void, a: c_int, b: c_int) -&gt; c_int
+      where F: Fn(i32, i32) -&gt; i32 {
+    let opt_closure = closure as *mut Option&lt;F&gt;;
+    unsafe {
+      let res = (*opt_closure).take().unwrap()(a as i32, b as i32);
+      return res as c_int;
+    }
+  }
+}
+</code></pre>
+
+<p>So, first we declare the prototype so we can call it from Rust code, fairly standard stuff here.
+Next, we make the actual exposed function and take a closure of the appropriate type. I&rsquo;ve opted
+for the <code>Fn</code> unboxed closure kind, but you could take a <code>FnMut</code> or even a <code>FnOnce</code> if you know the
+callback will only be called once.</p>
+
+<p>Now, inside this function is the tricky part. <code>&amp;f as *const _ as *mut c_void</code> takes a reference
+to the closure, casts it to a raw pointer (the <code>_</code> means that you want the compiler to infer that
+part of the type) and then casts again to get the <code>*mut c_void</code> we need to pass along as the user
+data. The actual call to the FFI function contains this oddity: <code>do_thing_wrapper::&lt;F&gt;</code> this uses
+the ability to explicitly provide the type parameters to functions to, well, explicitly provide the
+correct type. This is needed because otherwise Rust can&rsquo;t figure out the correct type to fill in.</p>
+
+<p>The <code>do_thing_wrapper</code> is a foreign-ABI Rust function. This means that it&rsquo;s a function, written in
+Rust, that uses a non-Rust ABI. In this case, because we didn&rsquo;t provide one explicitly, it falls
+defaults to &ldquo;C&rdquo;. Other than the type parameter, it matches the signature of the callback for the
+<code>ffi::do_thing</code> function.</p>
+
+<p>Inside the wrapper, we cast the closure to a <code>*mut Option&lt;F&gt;</code>, then do
+<code>(*opt_closure).take().unwrap()</code> on it, this returns the actual unboxed closure we started with.
+Then we call the closure, converting the arguments to the correct type and return the result,
+again converting to the appropriate type.</p>
+
+<p>And that&rsquo;s it! Note that this will only work if you know that the closure will be called before the
+end of <code>do_thing</code>. We take a pointer to the entire closure, which exists on the stack, so that
+pointer will become invalid when <code>do_thing</code> returns.</p>
+
+<h2>How it works</h2>
+
+<p>The way this works is actually remarkably simple. The key part is the <code>do_thing_wrapper::&lt;F&gt;</code>
+expression. Rust uses a technique called &ldquo;monomorphisation&rdquo; to handle generic types, including
+generic functions. Monomorphisation basically consists of subtituting the type parameters with
+concrete types and compiling the resulting non-generic function. What happens when <code>do_thing</code> is
+monomorphised is that <code>do_thing_wrapper::&lt;F&gt;</code> is also monomorphised, creating a unique function
+that is of the correct type to pass to the callback. Since we used a type parameter in
+<code>do_thing_wrapper</code>, we can cast from the passed opaque pointer to the actual closure and continue
+as normal.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[A Rustic Linker Model]]></title>
@@ -223,23 +321,17 @@ A simple wrong turn can lead you down a path that might not <em>ever</em> be use
 
 <p>A common pattern in old Rust code is to do something like this:</p>
 
-<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="n">struct</span> <span class="n">Foo_</span> <span class="p">{</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">struct</span> <span class="n">Foo_</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">num</span><span class="o">:</span> <span class="kt">int</span>
+</span><span class='line'><span class="p">}</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
 </span><span class='line'>
-</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="n">num</span><span class="o">:</span> <span class="k">int</span>
-</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
-</span><span class='line'>
-</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="p">}</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
-</span><span class='line'>
-</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="n">pub</span> <span class="k">type</span> <span class="n">Foo</span> <span class="o">=</span> <span class="o">@</span><span class="k">mut</span> <span class="n">Foo_</span><span class="p">;</span>
-</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">pub</span> <span class="k">type</span> <span class="n">Foo</span> <span class="o">=</span> <span class="o">@</span><span class="k">mut</span> <span class="n">Foo_</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure></p>
 
 <p>This code predates the powerful region system we have now, and (presumably) served to make life
 easier, since you would otherwise need to pass around a <code>@mut Foo</code> explicitly. Times have changed
@@ -247,19 +339,13 @@ though, and this pattern only makes it harder to fix things. Patrick Walton rece
 that 7% of the time spent during compilation is on ref-count bumping. This is because a function
 like this:</p>
 
-<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">fn</span> <span class="n">bar</span><span class="p">(</span><span class="n">a</span><span class="o">:</span> <span class="n">Foo</span><span class="p">)</span> <span class="o">&amp;</span><span class="n">ndash</span><span class="p">;</span><span class="o">&gt;</span> <span class="k">int</span> <span class="p">{</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
-</span><span class='line'>
-</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="n">a</span><span class="p">.</span><span class="n">num</span>
-</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
-</span><span class='line'>
-</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+</pre></td><td class='code'><pre><code class='rust'><span class='line'><span class="k">fn</span> <span class="n">bar</span><span class="p">(</span><span class="n">a</span><span class="o">:</span> <span class="n">Foo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">int</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">a</span><span class="p">.</span><span class="n">num</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure></p>
 
 <p>does a ref-count increase for <code>Foo</code> when entering the function, then later drops that count when
 the function ends. In the simple example above, that might be optimized out, but more often than
