@@ -12,7 +12,7 @@ quite well, with a robust and easy-to-use foreign function interface that requir
 than writing out the signatures of the foreign functions.
 
 However that is only half the battle when writing bindings. The next part is figuring out the best
-way to present the (normally) C API to Rust users. Exploiting the type system and features of the
+way to present the (normally) C API to Rust users; exploiting the type system and features of the
 language as best you can. Sometimes this is easy, sometimes hard, but one thing that is always
 tricky to manage are callbacks.
 
@@ -74,8 +74,8 @@ the ability to explicitly provide the type parameters to functions to, well, exp
 correct type. This is needed because otherwise Rust can't figure out the correct type to fill in.
 
 The `do_thing_wrapper` is a foreign-ABI Rust function. This means that it's a function, written in
-Rust, that uses a non-Rust ABI. In this case, because we didn't provide one explicitly, it falls
-defaults to "C". Other than the type parameter, it matches the signature of the callback for the
+Rust, that uses a non-Rust ABI. In this case, because we didn't provide one explicitly, it defaults
+to "C". Other than the type parameter, it matches the signature of the callback for the
 `ffi::do_thing` function.
 
 Inside the wrapper, we cast the closure to a `*mut Option<F>`, then do
