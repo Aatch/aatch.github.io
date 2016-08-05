@@ -114,86 +114,85 @@ way to present the (normally) C API to Rust users; exploiting the type system an
 language as best you can. Sometimes this is easy, sometimes hard, but one thing that is always
 tricky to manage are callbacks.</p>
 
-<p>Rust has closures as first-class entities, so it’s natural that a bindings author would want to use
-them when exposing a callback API to users. But how do you map Rust’s closures to C’s idea of
-functions? Well, that’s what I’m going to show you.</p>
+<p>Rust has closures as first-class entities, so it&rsquo;s natural that a bindings author would want to use
+them when exposing a callback API to users. But how do you map Rust&rsquo;s closures to C&rsquo;s idea of
+functions? Well, that&rsquo;s what I&rsquo;m going to show you.</p>
 
 <!--more-->
 
-<p>For the purposes of this demonstration, I’m going to assume that you have a C function that looks
+
+<p>For the purposes of this demonstration, I&rsquo;m going to assume that you have a C function that looks
 a little like this:</p>
 
-<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">void</span> <span class="n">do_thing</span><span class="p">(</span><span class="kt">int</span> <span class="p">(</span><span class="o">*</span><span class="n">cb</span><span class="p">)(</span><span class="kt">void</span><span class="o">*</span><span class="p">,</span> <span class="kt">int</span><span class="p">,</span> <span class="kt">int</span><span class="p">),</span> <span class="kt">void</span><span class="o">*</span> <span class="n">user_data</span><span class="p">);</span>
+<pre><code class="c">void do_thing(int (*cb)(void*, int, int), void* user_data);
 </code></pre>
-</div>
 
-<p>Note that the presence of that <code class="highlighter-rouge">void*</code> in both the callback signature and the function itself. This
-is fairly common, the pointer is passed to the callback untouched. It’s also required for this
-technique to work. I’ll show everything, end explain it afterwards.</p>
+<p>Note that the presence of that <code>void*</code> in both the callback signature and the function itself. This
+is fairly common, the pointer is passed to the callback untouched. It&rsquo;s also required for this
+technique to work. I&rsquo;ll show everything, end explain it afterwards.</p>
 
-<div class="language-rust highlighter-rouge"><pre class="highlight"><code><span class="k">pub</span> <span class="k">mod</span> <span class="n">ffi</span> <span class="p">{</span>
-  <span class="k">extern</span> <span class="s">"C"</span> <span class="p">{</span>
-    <span class="c">// Declare the prototype for the external function</span>
-    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">do_thing</span><span class="p">(</span><span class="n">cb</span><span class="p">:</span> <span class="k">extern</span> <span class="k">fn</span> <span class="p">(</span><span class="o">*</span><span class="k">mut</span> <span class="nb">c_void</span><span class="p">,</span> <span class="nb">c_int</span><span class="p">,</span> <span class="nb">c_int</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">c_int</span><span class="p">,</span>
-	   	  	    <span class="n">user_data</span><span class="p">:</span> <span class="o">*</span><span class="k">mut</span> <span class="nb">c_void</span><span class="p">);</span>
-  <span class="p">}</span>
-<span class="p">}</span>
+<pre><code class="rust">pub mod ffi {
+  extern "C" {
+    // Declare the prototype for the external function
+    pub fn do_thing(cb: extern fn (*mut c_void, c_int, c_int) -&gt; c_int,
+                user_data: *mut c_void);
+  }
+}
 
-<span class="c">// Exposed function to the user of the bindings</span>
-<span class="k">pub</span> <span class="k">fn</span> <span class="n">do_thing</span><span class="o">&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">F</span><span class="p">)</span> <span class="n">where</span> <span class="n">F</span><span class="p">:</span> <span class="nf">Fn</span><span class="p">(</span><span class="nb">i32</span><span class="p">,</span> <span class="nb">i32</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">i32</span> <span class="p">{</span>
-  <span class="k">let</span> <span class="n">user_data</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">f</span> <span class="k">as</span> <span class="o">*</span><span class="k">const</span> <span class="n">_</span> <span class="k">as</span> <span class="o">*</span><span class="k">mut</span> <span class="nb">c_void</span><span class="p">;</span>
-  <span class="k">unsafe</span> <span class="p">{</span>
-	<span class="nn">ffi</span><span class="p">::</span><span class="nf">do_thing</span><span class="p">(</span><span class="nn">do_thing_wrapper</span><span class="p">::</span><span class="o">&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">user_data</span><span class="p">);</span>
-  <span class="p">}</span>
+// Exposed function to the user of the bindings
+pub fn do_thing&lt;F&gt;(f: F) where F: Fn(i32, i32) -&gt; i32 {
+  let user_data = &amp;f as *const _ as *mut c_void;
+  unsafe {
+    ffi::do_thing(do_thing_wrapper::&lt;F&gt;, user_data);
+  }
 
-  <span class="c">// Shim interface function</span>
-  <span class="k">extern</span> <span class="k">fn</span> <span class="n">do_thing_wrapper</span><span class="o">&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">(</span><span class="n">closure</span><span class="p">:</span> <span class="o">*</span><span class="k">mut</span> <span class="nb">c_void</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">c_int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">c_int</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">c_int</span>
-      <span class="n">where</span> <span class="n">F</span><span class="p">:</span> <span class="nf">Fn</span><span class="p">(</span><span class="nb">i32</span><span class="p">,</span> <span class="nb">i32</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">i32</span> <span class="p">{</span>
-	<span class="k">let</span> <span class="n">opt_closure</span> <span class="o">=</span> <span class="n">closure</span> <span class="k">as</span> <span class="o">*</span><span class="k">mut</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="n">F</span><span class="o">&gt;</span><span class="p">;</span>
-	<span class="k">unsafe</span> <span class="p">{</span>
-	  <span class="k">let</span> <span class="n">res</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">opt_closure</span><span class="p">)</span><span class="nf">.take</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">()(</span><span class="n">a</span> <span class="k">as</span> <span class="nb">i32</span><span class="p">,</span> <span class="n">b</span> <span class="k">as</span> <span class="nb">i32</span><span class="p">);</span>
-	  <span class="k">return</span> <span class="n">res</span> <span class="k">as</span> <span class="nb">c_int</span><span class="p">;</span>
-    <span class="p">}</span>
-  <span class="p">}</span>
-<span class="p">}</span>
+  // Shim interface function
+  extern fn do_thing_wrapper&lt;F&gt;(closure: *mut c_void, a: c_int, b: c_int) -&gt; c_int
+      where F: Fn(i32, i32) -&gt; i32 {
+    let opt_closure = closure as *mut Option&lt;F&gt;;
+    unsafe {
+      let res = (*opt_closure).take().unwrap()(a as i32, b as i32);
+      return res as c_int;
+    }
+  }
+}
 </code></pre>
-</div>
 
 <p>So, first we declare the prototype so we can call it from Rust code, fairly standard stuff here.
-Next, we make the actual exposed function and take a closure of the appropriate type. I’ve opted
-for the <code class="highlighter-rouge">Fn</code> unboxed closure kind, but you could take a <code class="highlighter-rouge">FnMut</code> or even a <code class="highlighter-rouge">FnOnce</code> if you know the
+Next, we make the actual exposed function and take a closure of the appropriate type. I&rsquo;ve opted
+for the <code>Fn</code> unboxed closure kind, but you could take a <code>FnMut</code> or even a <code>FnOnce</code> if you know the
 callback will only be called once.</p>
 
-<p>Now, inside this function is the tricky part. <code class="highlighter-rouge">&amp;f as *const _ as *mut c_void</code> takes a reference
-to the closure, casts it to a raw pointer (the <code class="highlighter-rouge">_</code> means that you want the compiler to infer that
-part of the type) and then casts again to get the <code class="highlighter-rouge">*mut c_void</code> we need to pass along as the user
-data. The actual call to the FFI function contains this oddity: <code class="highlighter-rouge">do_thing_wrapper::&lt;F&gt;</code> this uses
+<p>Now, inside this function is the tricky part. <code>&amp;f as *const _ as *mut c_void</code> takes a reference
+to the closure, casts it to a raw pointer (the <code>_</code> means that you want the compiler to infer that
+part of the type) and then casts again to get the <code>*mut c_void</code> we need to pass along as the user
+data. The actual call to the FFI function contains this oddity: <code>do_thing_wrapper::&lt;F&gt;</code> this uses
 the ability to explicitly provide the type parameters to functions to, well, explicitly provide the
-correct type. This is needed because otherwise Rust can’t figure out the correct type to fill in.</p>
+correct type. This is needed because otherwise Rust can&rsquo;t figure out the correct type to fill in.</p>
 
-<p>The <code class="highlighter-rouge">do_thing_wrapper</code> is a foreign-ABI Rust function. This means that it’s a function, written in
-Rust, that uses a non-Rust ABI. In this case, because we didn’t provide one explicitly, it defaults
-to “C”. Other than the type parameter, it matches the signature of the callback for the
-<code class="highlighter-rouge">ffi::do_thing</code> function.</p>
+<p>The <code>do_thing_wrapper</code> is a foreign-ABI Rust function. This means that it&rsquo;s a function, written in
+Rust, that uses a non-Rust ABI. In this case, because we didn&rsquo;t provide one explicitly, it defaults
+to &ldquo;C&rdquo;. Other than the type parameter, it matches the signature of the callback for the
+<code>ffi::do_thing</code> function.</p>
 
-<p>Inside the wrapper, we cast the closure to a <code class="highlighter-rouge">*mut Option&lt;F&gt;</code>, then do
-<code class="highlighter-rouge">(*opt_closure).take().unwrap()</code> on it, this returns the actual unboxed closure we started with.
+<p>Inside the wrapper, we cast the closure to a <code>*mut Option&lt;F&gt;</code>, then do
+<code>(*opt_closure).take().unwrap()</code> on it, this returns the actual unboxed closure we started with.
 Then we call the closure, converting the arguments to the correct type and return the result,
 again converting to the appropriate type.</p>
 
-<p>And that’s it! Note that this will only work if you know that the closure will be called before the
-end of <code class="highlighter-rouge">do_thing</code>. We take a pointer to the entire closure, which exists on the stack, so that
-pointer will become invalid when <code class="highlighter-rouge">do_thing</code> returns.</p>
+<p>And that&rsquo;s it! Note that this will only work if you know that the closure will be called before the
+end of <code>do_thing</code>. We take a pointer to the entire closure, which exists on the stack, so that
+pointer will become invalid when <code>do_thing</code> returns.</p>
 
-<h2 id="how-it-works">How it works</h2>
+<h2>How it works</h2>
 
-<p>The way this works is actually remarkably simple. The key part is the <code class="highlighter-rouge">do_thing_wrapper::&lt;F&gt;</code>
-expression. Rust uses a technique called “monomorphisation” to handle generic types, including
+<p>The way this works is actually remarkably simple. The key part is the <code>do_thing_wrapper::&lt;F&gt;</code>
+expression. Rust uses a technique called &ldquo;monomorphisation&rdquo; to handle generic types, including
 generic functions. Monomorphisation basically consists of subtituting the type parameters with
-concrete types and compiling the resulting non-generic function. What happens when <code class="highlighter-rouge">do_thing</code> is
-monomorphised is that <code class="highlighter-rouge">do_thing_wrapper::&lt;F&gt;</code> is also monomorphised, creating a unique function
+concrete types and compiling the resulting non-generic function. What happens when <code>do_thing</code> is
+monomorphised is that <code>do_thing_wrapper::&lt;F&gt;</code> is also monomorphised, creating a unique function
 that is of the correct type to pass to the callback. Since we used a type parameter in
-<code class="highlighter-rouge">do_thing_wrapper</code>, we can cast from the passed opaque pointer to the actual closure and continue
+<code>do_thing_wrapper</code>, we can cast from the passed opaque pointer to the actual closure and continue
 as normal.</p>
 </div>
 
