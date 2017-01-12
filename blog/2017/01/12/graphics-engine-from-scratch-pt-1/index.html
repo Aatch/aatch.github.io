@@ -5,15 +5,13 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>Adventures in the Absurd</title>
+  <title>Graphics Engine From Scratch - Pt 1 - Adventures in the Absurd</title>
   <meta name="author" content="James Miller">
 
   
   <meta name="description" content="
+
   
-  
-    
-      
   
     
       Graphics Engine From Scratch - Pt 1
@@ -36,7 +34,7 @@
   
 
 
-  Computer graphics has a...">
+Computer graphics has always been an in...">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -45,7 +43,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://aatch.github.io/">
+  <link rel="canonical" href="http://aatch.github.io/blog/2017/01/12/graphics-engine-from-scratch-pt-1/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="Adventures in the Absurd" type="application/atom+xml">
@@ -81,14 +79,12 @@
 </nav>
   <div id="main">
     <div id="content">
-      <div class="blog-index">
+      <div>
+<article class="hentry" role="article">
   
-  
-    <article>
-      
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2017/01/12/graphics-engine-from-scratch-pt-1/">Graphics Engine From Scratch - Pt 1</a></h1>
+      <h1 class="entry-title">Graphics Engine From Scratch - Pt 1</h1>
     
     
       <p class="meta">
@@ -108,7 +104,7 @@
   </header>
 
 
-  <div class="entry-content"><p>Computer graphics has always been an interesting topic for me. The large amout of theory and maths
+<div class="entry-content"><p>Computer graphics has always been an interesting topic for me. The large amout of theory and maths
 required to render complex, detailed scenes at interactive framerates tickles a particular part of
 my brain. Fortunately for me, I&rsquo;m doing a computer graphics course at university starting in a
 couple months.</p>
@@ -262,69 +258,14 @@ struct Material {
 <p>With the <code>draw_object</code> function doing the actual work of converting the data in an <code>Object</code> to
 something OpenGL can use. On that note, the next part will be about OpenGL.</p>
 </div>
-  
-  
 
 
-    </article>
-  
-    <article>
+  <footer>
+    <p class="meta">
       
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/">Unboxed Closures and FFI Callbacks</a></h1>
-    
-    
-      <p class="meta">
-        
+<span class="byline author vcard">Posted by <span class="fn">James Miller</span></span>
 
-
-
-
-
-
-
-
-
-<time datetime="2015-01-17T11:24:36+13:00" pubdate data-updated="true"></time>
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Rust is awesome, but sometimes you need to step out of the comforting embrace of a powerful type
-system and watchful compiler and interact with other languages. Fortunately Rust handles this
-quite well, with a robust and easy-to-use foreign function interface that requires little more
-than writing out the signatures of the foreign functions.</p>
-
-<p>However that is only half the battle when writing bindings. The next part is figuring out the best
-way to present the (normally) C API to Rust users; exploiting the type system and features of the
-language as best you can. Sometimes this is easy, sometimes hard, but one thing that is always
-tricky to manage are callbacks.</p>
-
-<p>Rust has closures as first-class entities, so it&rsquo;s natural that a bindings author would want to use
-them when exposing a callback API to users. But how do you map Rust&rsquo;s closures to C&rsquo;s idea of
-functions? Well, that&rsquo;s what I&rsquo;m going to show you.</p>
-</div>
-  
-  
-    <footer>
-      <a rel="full-article" href="/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/">Read on &rarr;</a>
-    </footer>
-  
-
-
-    </article>
-  
-    <article>
       
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2013/10/29/a-rustic-linker-model/">A Rustic Linker Model</a></h1>
-    
-    
-      <p class="meta">
-        
 
 
 
@@ -334,72 +275,33 @@ functions? Well, that&rsquo;s what I&rsquo;m going to show you.</p>
 
 
 
-<time datetime="2013-10-29T13:15:00+13:00" pubdate data-updated="true"></time>
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>This is a kinda-sorta proposal for a linking model for the rust compiler to use, allowing us to
-separate out from system-specific semantics and avoid being tied too closely to a system linker.
-The goals are to maintain most compatibility with system tools (linkers in particular), allow
-common cases to behave identically on all supported platforms and maintain an escape hatch to allow
-complex and/or esoteric cases to still work without too much hackery or relying on undocumented
-behaviour.</p>
-</div>
-  
-  
-    <footer>
-      <a rel="full-article" href="/blog/2013/10/29/a-rustic-linker-model/">Read on &rarr;</a>
-    </footer>
-  
-
-
-    </article>
-  
-    <article>
+<time datetime="2017-01-12T11:40:23+13:00" pubdate data-updated="true"></time>
       
-  <header>
+
+<span class="categories">
+  
+    rust,graphics-from-scratch
+  
+</span>
+
+
+    </p>
     
-      <h1 class="entry-title"><a href="/blog/2013/06/19/paying-technical-debt-in-rustc/">Paying Technical Debt in Rustc</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-
-<time datetime="2013-06-19T14:00:00+12:00" pubdate data-updated="true"></time>
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>With the 0.7 release of Rust almost upon us, it seems like a good time talk about some of the
-technical debt that has accrued in the compiler, the issues in the codegen module and plan of
-action to try and start paying off some of that debt.</p>
+      <div class="sharing">
+  
+  
+  
 </div>
-  
-  
-    <footer>
-      <a rel="full-article" href="/blog/2013/06/19/paying-technical-debt-in-rustc/">Read on &rarr;</a>
-    </footer>
-  
 
-
-    </article>
-  
-  <div class="pagination">
     
-    <a href="/blog/archives/">Blog Archives</a>
-    
-  </div>
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2015/01/17/unboxed-closures-and-ffi-callbacks/" title="Previous Post: Unboxed Closures and FFI Callbacks">&laquo; Unboxed Closures and FFI Callbacks</a>
+      
+      
+    </p>
+  </footer>
+</article>
 </div>
 
     </div>
